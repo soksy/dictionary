@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Python CLI tool that reads a text file of words (one per line), looks up kid-friendly definitions and synonyms via the Merriam-Webster Elementary Dictionary and Intermediate Thesaurus APIs (falling back to NLTK WordNet when no API key is configured or a word isn't found), and generates a styled, colorful PDF dictionary alongside a matching-test PDF for the same word list.
+A Python CLI tool that reads a text file of words (one per line), looks up kid-friendly definitions and synonyms via the Merriam-Webster Elementary Dictionary and Intermediate Thesaurus APIs (falling back to NLTK WordNet when no API key is configured or a word isn't found), and generates a styled, colorful PDF dictionary alongside a matching-test PDF and matching answer-key PDF for the same word list.
 
 ## Commands
 
@@ -20,7 +20,7 @@ py -m venv .venv
 python dictionary_app.py words.txt
 
 # Run with custom output filenames
-python dictionary_app.py words.txt -o custom_name.pdf -t custom_test.pdf
+python dictionary_app.py words.txt -o custom_name.pdf -t custom_test.pdf -a custom_answers.pdf
 
 # Bypass the cache entirely (always look up fresh, don't store results)
 python dictionary_app.py words.txt --no-cache
@@ -45,7 +45,7 @@ thesaurus_key = YOUR_THESAURUS_KEY_HERE
 
 ## Architecture
 
-Single-file app (`dictionary_app.py`) with six layers:
+Single-file app (`dictionary_app.py`) with seven layers:
 
 1. **Word reader** (`read_words`) — reads input file, strips blanks, deduplicates, sorts alphabetically
 2. **Config loader** (`load_config`) — reads `config.ini` for the two Merriam-Webster API keys
@@ -53,6 +53,7 @@ Single-file app (`dictionary_app.py`) with six layers:
 4. **Lookup** (`lookup_word`) — tries `lookup_word_mw_dictionary` (Elementary Dictionary `sd2` reference) for definitions and `lookup_word_mw_synonyms` (Intermediate Thesaurus `ithesaurus` reference) for synonyms; falls back to `lookup_word_wordnet`/`wordnet_synonyms` (NLTK WordNet, offline) when a key is missing or the word isn't found. M-W response text contains run-in markup tokens (`{bc}`, `{sx|...}`, etc.) cleaned up by `_clean_mw_text`. Max 2 definitions per part of speech, max 8 synonyms. Each returned entry carries a `source` field (`"MW"` or `"WN"`) used both for the cache and the PDF's source tag.
 5. **Dictionary PDF builder** (`build_pdf`) — uses reportlab's `SimpleDocTemplate`/`Platypus` to produce a Letter-size PDF; each word's full entry is wrapped in `KeepTogether` so it never splits across a page break
 6. **Test PDF builder** (`build_test_pdf`) — produces a second Letter-size PDF: a question section listing every word (in the same alphabetical order as the dictionary) next to an empty answer box, followed by a page break and a "Definitions" section listing one definition per word (`_first_definition`, the first definition of the first meaning) in shuffled order and numbered 1..N. Students write the matching definition number in the box next to each word.
+7. **Answer key PDF builder** (`build_answer_key_pdf`) — produces a third Letter-size PDF reusing the same word/answer-box table layout as the test paper, but with each box pre-filled with the correct definition number. `main()` calls `shuffle_definition_order(entries)` once to get the shuffled definition order, then passes that same `shuffled_indices` list to both `build_test_pdf` and `build_answer_key_pdf` so the two PDFs are guaranteed to agree; `_answer_numbers(shuffled_indices)` inverts the shuffle to get each word's correct 1-based definition number. The word/answer-box table itself is shared via `_build_word_answer_table(entries, answers=None)` — `answers=None` renders empty boxes (test paper), a list of ints renders bold centered numbers (answer key).
 
 ## PDF Layout
 
@@ -69,6 +70,10 @@ Test paper (`build_test_pdf`):
 - Title, Name/Date line, and instructions, then a three-column table (word, narrow gap, answer box) covering every word in order — the word cell is outlined in gray so the whitespace after short words stays visually grouped with that word, and a gap column keeps the outline from touching the black answer box, making it easier to find the right box when not working through words in order
 - Page break, then a numbered, shuffled list of definitions (one per word, via `random.shuffle`)
 - Same 1-inch margins and Letter page size as the dictionary
+
+Answer key (`build_answer_key_pdf`):
+- Same title/table styling as the test paper, minus the Name/Date line and Definitions page — just the word list with each answer box filled in with the correct definition number (bold, centered)
+- Shares the exact word order and definition shuffle with `build_test_pdf` (both are built from the same `shuffled_indices` in `main()`) so the numbers always line up with the corresponding test paper
 
 ## Key Dependencies
 

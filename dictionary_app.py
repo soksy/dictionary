@@ -17,7 +17,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, HRFlowable, KeepTogether,
     Table, TableStyle, PageBreak
 )
-from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
 
 
 BLUE = HexColor("#1a5276")
@@ -431,7 +431,57 @@ def _first_definition(entry):
     return ""
 
 
-def build_test_pdf(entries, output_path):
+def _test_title_style():
+    return ParagraphStyle(
+        "TestTitle",
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        textColor=BLUE,
+        spaceAfter=10,
+        alignment=TA_LEFT,
+    )
+
+
+def shuffle_definition_order(entries):
+    shuffled_indices = list(range(len(entries)))
+    random.shuffle(shuffled_indices)
+    return shuffled_indices
+
+
+def _answer_numbers(shuffled_indices):
+    """Map each entry's original index to its 1-based correct definition number."""
+    numbers = [0] * len(shuffled_indices)
+    for display_num, orig_idx in enumerate(shuffled_indices, start=1):
+        numbers[orig_idx] = display_num
+    return numbers
+
+
+def _build_word_answer_table(entries, answers=None):
+    word_style = ParagraphStyle("TestWord", fontName="Helvetica", fontSize=11)
+    answer_style = ParagraphStyle(
+        "AnswerNumber", fontName="Helvetica-Bold", fontSize=11, alignment=TA_CENTER
+    )
+
+    rows = []
+    for i, entry in enumerate(entries):
+        answer_cell = Paragraph(str(answers[i]), answer_style) if answers is not None else ""
+        rows.append([Paragraph(entry["word"].capitalize(), word_style), "", answer_cell])
+
+    table = Table(rows, colWidths=[4.0 * inch, 0.2 * inch, 0.5 * inch], rowHeights=0.32 * inch)
+    table_commands = [
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (0, -1), 8),
+    ]
+    for i in range(len(rows)):
+        table_commands.append(("BOX", (0, i), (0, i), 0.75, GRAY))
+        table_commands.append(("BOX", (2, i), (2, i), 0.75, BLACK))
+    table.setStyle(TableStyle(table_commands))
+    return table
+
+
+def build_test_pdf(entries, output_path, shuffled_indices):
     doc = SimpleDocTemplate(
         output_path,
         pagesize=letter,
@@ -441,14 +491,7 @@ def build_test_pdf(entries, output_path):
         bottomMargin=inch,
     )
 
-    title_style = ParagraphStyle(
-        "TestTitle",
-        fontName="Helvetica-Bold",
-        fontSize=18,
-        textColor=BLUE,
-        spaceAfter=10,
-        alignment=TA_LEFT,
-    )
+    title_style = _test_title_style()
     header_style = ParagraphStyle(
         "TestHeader",
         fontName="Helvetica",
@@ -461,11 +504,6 @@ def build_test_pdf(entries, output_path):
         fontSize=10,
         textColor=GRAY,
         spaceAfter=16,
-    )
-    word_style = ParagraphStyle(
-        "TestWord",
-        fontName="Helvetica",
-        fontSize=11,
     )
     def_style = ParagraphStyle(
         "TestDef",
@@ -487,29 +525,47 @@ def build_test_pdf(entries, output_path):
         instruction_style,
     ))
 
-    rows = [[Paragraph(entry["word"].capitalize(), word_style), "", ""] for entry in entries]
-    table = Table(rows, colWidths=[4.0 * inch, 0.2 * inch, 0.5 * inch], rowHeights=0.32 * inch)
-    table_commands = [
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (0, -1), 8),
-    ]
-    for i in range(len(rows)):
-        table_commands.append(("BOX", (0, i), (0, i), 0.75, GRAY))
-        table_commands.append(("BOX", (2, i), (2, i), 0.75, BLACK))
-    table.setStyle(TableStyle(table_commands))
-    story.append(table)
+    story.append(_build_word_answer_table(entries))
 
     story.append(PageBreak())
     story.append(Paragraph("Definitions", title_style))
     story.append(Spacer(1, 8))
 
-    shuffled_indices = list(range(len(entries)))
-    random.shuffle(shuffled_indices)
     for display_num, orig_idx in enumerate(shuffled_indices, start=1):
         definition_text = _first_definition(entries[orig_idx])
         story.append(Paragraph(f"{display_num}.  {escape(definition_text)}", def_style))
+
+    doc.build(story)
+
+
+def build_answer_key_pdf(entries, output_path, shuffled_indices):
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=letter,
+        leftMargin=inch,
+        rightMargin=inch,
+        topMargin=inch,
+        bottomMargin=inch,
+    )
+
+    title_style = _test_title_style()
+    instruction_style = ParagraphStyle(
+        "Instruction",
+        fontName="Helvetica-Oblique",
+        fontSize=10,
+        textColor=GRAY,
+        spaceAfter=16,
+    )
+
+    story = []
+    story.append(Paragraph("Vocabulary Matching Test &mdash; Answer Key", title_style))
+    story.append(Paragraph(
+        "For teacher use. The number in each box is the correct definition number for that word.",
+        instruction_style,
+    ))
+
+    answers = _answer_numbers(shuffled_indices)
+    story.append(_build_word_answer_table(entries, answers=answers))
 
     doc.build(story)
 
@@ -523,6 +579,8 @@ def main():
                         help="Output PDF filename (default: dictionary.pdf)")
     parser.add_argument("-t", "--test-output", default="test.pdf",
                         help="Output test paper PDF filename (default: test.pdf)")
+    parser.add_argument("-a", "--answer-output", default="answer_key.pdf",
+                        help="Output answer key PDF filename (default: answer_key.pdf)")
     parser.add_argument("--cache-db", default=CACHE_DB_PATH,
                         help=f"Path to the local SQLite lookup cache (default: {CACHE_DB_PATH})")
     parser.add_argument("--no-cache", action="store_true",
@@ -561,9 +619,15 @@ def main():
         print("No definitions found. PDF not created.")
         sys.exit(1)
 
+    shuffled_indices = shuffle_definition_order(entries)
+
     build_pdf(entries, args.output)
-    build_test_pdf(entries, args.test_output)
-    print(f"\nDone! {len(entries)} entries written to {args.output} and {args.test_output}")
+    build_test_pdf(entries, args.test_output, shuffled_indices)
+    build_answer_key_pdf(entries, args.answer_output, shuffled_indices)
+    print(
+        f"\nDone! {len(entries)} entries written to {args.output}, "
+        f"{args.test_output}, and {args.answer_output}"
+    )
 
 
 if __name__ == "__main__":
