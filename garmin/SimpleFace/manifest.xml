@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Connect IQ application manifest.
+
+  The application "id" below is a placeholder GUID. When you first open this
+  project in VS Code, the Monkey C extension can regenerate it for you, or you
+  can keep this one for personal/sideloaded use. If you ever publish to the
+  Connect IQ Store, each app needs its own unique id.
+
+  Products list the target devices. "fenixe" is the Garmin Fenix E. To add or
+  confirm devices with a GUI, run  Monkey C: Edit Products  from the VS Code
+  command palette (Ctrl/Cmd+Shift+P) — it edits this <iq:products> block.
+-->
+<iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
+    <iq:application
+        entry="SimpleFaceApp"
+        id="d9c9a6d4e0d24b0a9b1c3e5f7a8b9c0d"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="3.1.0"
+        name="@Strings.AppName"
+        type="watchface">
+        <iq:products>
+            <iq:product id="fenixe"/>
+        </iq:products>
+        <iq:permissions/>
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>

@@ -1,0 +1,7 @@
+# Connect IQ build configuration ("jungle" file).
+# The defaults below are enough for a single-target watch face: the SDK reads
+# manifest.xml for the product list and picks up everything under resources/
+# and source/ automatically. Add device-specific resource overrides here later
+# if you need them (e.g. base.resourcePath, fenixe.resourcePath, ...).
+
+project.manifest = manifest.xml
