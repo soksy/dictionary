@@ -194,6 +194,28 @@ def _clean_mw_text(text):
     return text.strip()
 
 
+def _mw_headword(entry):
+    return entry.get("hwi", {}).get("hw", "").replace("*", "").lower()
+
+
+def _mw_matching_entries(data, word):
+    """Return the M-W entries that belong to ``word``.
+
+    Entries whose headword is exactly ``word`` win. If there are none (e.g. the
+    list word is an inflected form like "hauled" or "critics", whose headword is
+    "haul"/"critic"), fall back to entries that list ``word`` in ``meta.stems``.
+    """
+    word = word.lower()
+    entries = [e for e in data if isinstance(e, dict)]
+    exact = [e for e in entries if _mw_headword(e) == word]
+    if exact:
+        return exact
+    return [
+        e for e in entries
+        if word in (s.lower() for s in e.get("meta", {}).get("stems", []))
+    ]
+
+
 def lookup_word_mw_dictionary(word, key):
     if not key:
         return None
@@ -214,10 +236,7 @@ def lookup_word_mw_dictionary(word, key):
         return None
 
     meanings_by_pos = {}
-    for sense in data:
-        hw = sense.get("hwi", {}).get("hw", "").replace("*", "")
-        if hw.lower() != word.lower():
-            continue
+    for sense in _mw_matching_entries(data, word):
         pos = sense.get("fl", "")
         shortdefs = sense.get("shortdef", [])
         if not shortdefs:
@@ -254,10 +273,7 @@ def lookup_word_mw_synonyms(word, key):
         return []
 
     synonyms = set()
-    for sense in data:
-        hw = sense.get("hwi", {}).get("hw", "").replace("*", "")
-        if hw.lower() != word.lower():
-            continue
+    for sense in _mw_matching_entries(data, word):
         for group in sense.get("meta", {}).get("syns", []):
             synonyms.update(group)
 
