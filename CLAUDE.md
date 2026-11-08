@@ -33,7 +33,7 @@ Without activating, prefix any command with `.venv\Scripts\python.exe` instead o
 
 ## Setup: Merriam-Webster API keys
 
-Register for free keys at https://www.dictionaryapi.com/register/index — sign up for the **Elementary Dictionary** and **Intermediate Thesaurus** APIs separately, then paste both keys into `config.ini`:
+Register for free keys at https://www.dictionaryapi.com/register/index — sign up for the **Elementary Dictionary** and **Intermediate Thesaurus** APIs separately, then copy `config.example.ini` to `config.ini` and paste both keys in. `config.ini` is gitignored so the keys never get committed — never add it back to git:
 
 ```ini
 [merriam_webster]
